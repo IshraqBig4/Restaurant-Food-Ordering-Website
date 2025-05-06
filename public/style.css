@@ -981,3 +981,23 @@ footer {
         grid-template-columns: 1fr;
     }
 }
+
+@media (max-width: 768px) {
+    .menu {
+        display: none;
+        flex-direction: column;
+        position: absolute;
+        top: 80px;
+        left: 0;
+        width: 100%;
+        background-color: #fff;
+        box-shadow: var(--shadow);
+    }
+    .menu.active {
+        display: flex;
+    }
+    .menu li {
+        margin: 10px 0;
+        text-align: center;
+    }
+}
