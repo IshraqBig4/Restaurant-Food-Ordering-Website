@@ -95,10 +95,17 @@ function updateUserUI() {
 }
 
 function logout() {
-    currentUser = null;
-    localStorage.removeItem('currentUser');
-    updateUserUI();
-    alert("You have been logged out.");
+    fetch("http://localhost:4000/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+    })
+        .then(() => {
+            currentUser = null;
+            localStorage.removeItem("currentUser");
+            updateUserUI();
+            alert("You have been logged out.");
+        })
+        .catch((error) => alert("Logout failed: " + error.message));
 }
 
 function renderMenu(category = 'all') {
@@ -148,6 +155,18 @@ function changeQty(id, delta) {
     input.value = val;
 }
 
+function saveCart() {
+    localStorage.setItem("cart", JSON.stringify(cart));
+}
+
+function loadCart() {
+    const savedCart = localStorage.getItem("cart");
+    if (savedCart) {
+        cart = JSON.parse(savedCart);
+        updateCartUI();
+    }
+}
+
 function addToCart(id) {
     const item = Object.values(menuData).flat().find(i => i.id === id);
     if (item) {
@@ -164,6 +183,7 @@ function addToCart(id) {
         }
         updateCartUI();
         renderMenu(document.querySelector(".category-btn.active").dataset.category);
+        saveCart();
     }
 }
 
@@ -171,6 +191,7 @@ function removeFromCart(id) {
     cart = cart.filter(item => item.id !== id);
     updateCartUI();
     renderMenu(document.querySelector(".category-btn.active").dataset.category);
+    saveCart();
 }
 
 function changeCartQuantity(id, delta) {
@@ -183,7 +204,15 @@ function changeCartQuantity(id, delta) {
             updateCartUI();
         }
     }
+    saveCart();
 }
+
+window.onload = async () => {
+    loadCart();
+    menuData = await fetchMenu();
+    renderMenu("all");
+    updateUserUI();
+};
 
 function updateCartUI() {
     const cartContainer = document.getElementById("cartItems");
@@ -253,13 +282,14 @@ document.getElementById("deliveryForm").addEventListener("submit", async (e) => 
             },
             items: cart,
             payment: "cash",
-            total: document.getElementById("orderTotal").innerText
+            total: document.getElementById("orderTotal").innerText,
         };
 
-        const response = await fetch("/api/order", {
+        const response = await fetch("http://localhost:4000/api/order", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(order)
+            body: JSON.stringify(order),
+            credentials: "include",
         });
 
         const result = await response.json();
@@ -270,6 +300,10 @@ document.getElementById("deliveryForm").addEventListener("submit", async (e) => 
             document.getElementById("checkoutModal").style.display = "none";
             document.getElementById("orderConfirmationModal").style.display = "block";
         } else {
+            if (result.errors) {
+                const errorMessages = result.errors.map(err => err.msg).join(", ");
+                throw new Error(errorMessages);
+            }
             throw new Error(result.message || "Order failed");
         }
     } catch (error) {
@@ -313,37 +347,22 @@ document.getElementById("userLoginForm").addEventListener("submit", async (e) =>
     const email = document.getElementById("loginEmail").value.trim();
     const password = document.getElementById("loginPassword").value;
 
-    // Basic validation
     if (!email || !password) {
         alert("Please fill in all fields.");
         return;
     }
 
-    // Simulated authentication with localStorage
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const user = users.find(u => u.email === email && u.password === password);
-    if (user) {
-        currentUser = { email: user.email, name: user.name };
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        updateUserUI();
-        document.getElementById("authModal").style.display = "none";
-        alert("Login successful!");
-    } else {
-        alert("Invalid email or password.");
-    }
-
-    // Real API integration (uncomment and replace with actual endpoint)
-    /*
     try {
-        const response = await fetch("/api/login", {
+        const response = await fetch("http://localhost:4000/api/auth/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, password }),
+            credentials: "include", // Include cookies for JWT
         });
         const result = await response.json();
         if (result.success) {
             currentUser = { email, name: result.name };
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            localStorage.setItem("currentUser", JSON.stringify(currentUser));
             updateUserUI();
             document.getElementById("authModal").style.display = "none";
             alert("Login successful!");
@@ -353,7 +372,6 @@ document.getElementById("userLoginForm").addEventListener("submit", async (e) =>
     } catch (error) {
         alert("Login failed: " + error.message);
     }
-    */
 });
 
 document.getElementById("userRegisterForm").addEventListener("submit", async (e) => {
@@ -364,7 +382,6 @@ document.getElementById("userRegisterForm").addEventListener("submit", async (e)
     const password = document.getElementById("registerPassword").value;
     const confirmPassword = document.getElementById("registerConfirmPassword").value;
 
-    // Validation
     if (!name || !email || !phone || !password || !confirmPassword) {
         alert("Please fill in all fields.");
         return;
@@ -382,32 +399,17 @@ document.getElementById("userRegisterForm").addEventListener("submit", async (e)
         return;
     }
 
-    // Simulated registration with localStorage
-    let users = JSON.parse(localStorage.getItem('users')) || [];
-    if (users.some(u => u.email === email)) {
-        alert("Email already registered.");
-        return;
-    }
-    users.push({ name, email, phone, password });
-    localStorage.setItem('users', JSON.stringify(users));
-    currentUser = { email, name };
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-    updateUserUI();
-    document.getElementById("authModal").style.display = "none";
-    alert("Registration successful! You are now logged in.");
-
-    // Real API integration (uncomment and replace with actual endpoint)
-    /*
     try {
-        const response = await fetch("/api/register", {
+        const response = await fetch("http://localhost:4000/api/auth/register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, email, phone, password })
+            body: JSON.stringify({ name, email, password }),
+            credentials: "include",
         });
         const result = await response.json();
         if (result.success) {
             currentUser = { email, name };
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            localStorage.setItem("currentUser", JSON.stringify(currentUser));
             updateUserUI();
             document.getElementById("authModal").style.display = "none";
             alert("Registration successful! You are now logged in.");
@@ -417,7 +419,6 @@ document.getElementById("userRegisterForm").addEventListener("submit", async (e)
     } catch (error) {
         alert("Registration failed: " + error.message);
     }
-    */
 });
 
 // Form validation feedback
@@ -483,3 +484,71 @@ window.onload = () => {
     renderMenu("all");
     updateUserUI();
 };
+
+async function fetchMenu() {
+    try {
+        const response = await fetch("http://localhost:4000/api/menu", {
+            credentials: "include",
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        const result = await response.json();
+        if (result.success) {
+            const menuData = {};
+            result.data.forEach(item => {
+                if (!menuData[item.category]) menuData[item.category] = [];
+                menuData[item.category].push(item);
+            });
+            return menuData;
+        } else {
+            throw new Error(result.message || "Failed to fetch menu");
+        }
+    } catch (error) {
+        console.error("Error fetching menu:", error.message);
+        alert(`Failed to load menu: ${error.message}. Using default data.`);
+        return menuData; // Fallback to hardcoded data
+    }
+}
+
+window.onload = async () => {
+    menuData = await fetchMenu();
+    renderMenu("all");
+    updateUserUI();
+};
+
+document.querySelector(".mobile-menu-toggle").addEventListener("click", () => {
+    const menu = document.querySelector(".menu");
+    menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+});
+
+function validateForm(formId) {
+    const form = document.getElementById(formId);
+    form.addEventListener("submit", (e) => {
+        let valid = true;
+        form.querySelectorAll("input[required]").forEach(input => {
+            if (!input.value.trim()) {
+                input.style.borderColor = "red";
+                valid = false;
+            } else {
+                input.style.borderColor = "";
+            }
+        });
+        if (formId === "userRegisterForm") {
+            const password = document.getElementById("registerPassword").value;
+            const confirmPassword = document.getElementById("registerConfirmPassword").value;
+            if (password !== confirmPassword) {
+                alert("Passwords do not match!");
+                valid = false;
+            }
+            if (password.length < 6) {
+                alert("Password must be at least 6 characters long.");
+                valid = false;
+            }
+        }
+        if (!valid) e.preventDefault();
+    });
+}
+validateForm("userLoginForm");
+validateForm("userRegisterForm");
+validateForm("deliveryForm");
