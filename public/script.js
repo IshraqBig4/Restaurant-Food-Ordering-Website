@@ -71,41 +71,10 @@ const menuData = {
 
 let cart = [];
 
-// Authentication state
-let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
-
 function sanitize(str) {
     const div = document.createElement("div");
     div.textContent = str;
     return div.innerHTML;
-}
-
-function updateUserUI() {
-    const userIcon = document.getElementById("user-icon");
-    const userLink = document.getElementById("user-account-link");
-    if (currentUser) {
-        userIcon.classList.remove("fa-user");
-        userIcon.classList.add("fa-sign-out-alt");
-        userLink.title = "Logout";
-    } else {
-        userIcon.classList.remove("fa-sign-out-alt");
-        userIcon.classList.add("fa-user");
-        userLink.title = "Login/Register";
-    }
-}
-
-function logout() {
-    fetch("http://localhost:4000/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-    })
-        .then(() => {
-            currentUser = null;
-            localStorage.removeItem("currentUser");
-            updateUserUI();
-            alert("You have been logged out.");
-        })
-        .catch((error) => alert("Logout failed: " + error.message));
 }
 
 function renderMenu(category = 'all') {
@@ -118,9 +87,7 @@ function renderMenu(category = 'all') {
             items.push(...menuData[key]);
         }
     } else {
-        for (let key in menuData) {
-            items.push(...menuData[key].filter(item => item.category === category));
-        }
+        items.push(...menuData[category]);
     }
 
     items.forEach(item => {
@@ -207,13 +174,6 @@ function changeCartQuantity(id, delta) {
     saveCart();
 }
 
-window.onload = async () => {
-    loadCart();
-    menuData = await fetchMenu();
-    renderMenu("all");
-    updateUserUI();
-};
-
 function updateCartUI() {
     const cartContainer = document.getElementById("cartItems");
     const orderContainer = document.getElementById("orderItems");
@@ -258,180 +218,26 @@ function updateCartUI() {
     let total = subtotal + DELIVERY_FEE;
     document.getElementById("cartSubtotal").innerText = `${subtotal} SAR`;
     document.getElementById("cartTotal").innerText = `${total} SAR`;
-    document.getElementById("orderSubtotal").innerText = `${subtotal} SAR`;
+    document.getElementById("orderSubtotal").inner управлениеText = `${subtotal} SAR`;
     document.getElementById("orderTotal").innerText = `${total} SAR`;
 }
 
-document.getElementById("deliveryForm").addEventListener("submit", async (e) => {
+document.getElementById("deliveryForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    if (!currentUser) {
-        alert("Please log in to place an order.");
-        document.getElementById("authModal").style.display = "block";
-        return;
-    }
-    try {
-        const order = {
-            customer: {
-                name: document.getElementById("fullName").value,
-                phone: document.getElementById("phone").value,
-                email: document.getElementById("email").value,
-                address: document.getElementById("address").value,
-                city: document.getElementById("city").value,
-                zipCode: document.getElementById("zipCode").value,
-                directions: document.getElementById("additionalDirections").value,
-            },
-            items: cart,
-            payment: "cash",
-            total: document.getElementById("orderTotal").innerText,
-        };
-
-        const response = await fetch("http://localhost:4000/api/order", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(order),
-            credentials: "include",
-        });
-
-        const result = await response.json();
-        if (result.success) {
-            cart = [];
-            updateCartUI();
-            document.getElementById("orderIdDisplay").innerText = result.orderId;
-            document.getElementById("checkoutModal").style.display = "none";
-            document.getElementById("orderConfirmationModal").style.display = "block";
-        } else {
-            if (result.errors) {
-                const errorMessages = result.errors.map(err => err.msg).join(", ");
-                throw new Error(errorMessages);
-            }
-            throw new Error(result.message || "Order failed");
-        }
-    } catch (error) {
-        alert(`Failed to place order: ${error.message}. Please try again.`);
-    }
+    // Simulate order placement
+    cart = [];
+    updateCartUI();
+    document.getElementById("orderIdDisplay").innerText = "GHR-12345";
+    document.getElementById("checkoutModal").style.display = "none";
+    document.getElementById("orderConfirmationModal").style.display = "block";
+    saveCart();
 });
 
-// Auth Modal Handling
 document.getElementById("order-now-btn").addEventListener("click", (e) => {
     e.preventDefault();
-    document.getElementById("authModal").style.display = "block";
+    document.getElementById("cartModal").style.display = "block";
+    updateCartUI();
 });
-
-document.getElementById("user-account-link").addEventListener("click", (e) => {
-    e.preventDefault();
-    if (currentUser) {
-        logout();
-    } else {
-        document.getElementById("authModal").style.display = "block";
-    }
-});
-
-document.getElementById("loginTab").addEventListener("click", () => {
-    document.getElementById("loginTab").classList.add("active");
-    document.getElementById("registerTab").classList.remove("active");
-    document.getElementById("loginForm").classList.add("active");
-    document.getElementById("registerForm").classList.remove("active");
-    document.getElementById("authTitle").innerText = "Login";
-});
-
-document.getElementById("registerTab").addEventListener("click", () => {
-    document.getElementById("registerTab").classList.add("active");
-    document.getElementById("loginTab").classList.remove("active");
-    document.getElementById("registerForm").classList.add("active");
-    document.getElementById("loginForm").classList.remove("active");
-    document.getElementById("authTitle").innerText = "Register";
-});
-
-document.getElementById("userLoginForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = document.getElementById("loginEmail").value.trim();
-    const password = document.getElementById("loginPassword").value;
-
-    if (!email || !password) {
-        alert("Please fill in all fields.");
-        return;
-    }
-
-    try {
-        const response = await fetch("http://localhost:4000/api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
-            credentials: "include", // Include cookies for JWT
-        });
-        const result = await response.json();
-        if (result.success) {
-            currentUser = { email, name: result.name };
-            localStorage.setItem("currentUser", JSON.stringify(currentUser));
-            updateUserUI();
-            document.getElementById("authModal").style.display = "none";
-            alert("Login successful!");
-        } else {
-            alert(result.message || "Login failed.");
-        }
-    } catch (error) {
-        alert("Login failed: " + error.message);
-    }
-});
-
-document.getElementById("userRegisterForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const name = document.getElementById("registerName").value.trim();
-    const email = document.getElementById("registerEmail").value.trim();
-    const phone = document.getElementById("registerPhone").value.trim();
-    const password = document.getElementById("registerPassword").value;
-    const confirmPassword = document.getElementById("registerConfirmPassword").value;
-
-    if (!name || !email || !phone || !password || !confirmPassword) {
-        alert("Please fill in all fields.");
-        return;
-    }
-    if (password !== confirmPassword) {
-        alert("Passwords do not match!");
-        return;
-    }
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-        alert("Please enter a valid email address.");
-        return;
-    }
-    if (!/^\+?\d{10,}$/.test(phone)) {
-        alert("Please enter a valid phone number.");
-        return;
-    }
-
-    try {
-        const response = await fetch("http://localhost:4000/api/auth/register", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, email, password }),
-            credentials: "include",
-        });
-        const result = await response.json();
-        if (result.success) {
-            currentUser = { email, name };
-            localStorage.setItem("currentUser", JSON.stringify(currentUser));
-            updateUserUI();
-            document.getElementById("authModal").style.display = "none";
-            alert("Registration successful! You are now logged in.");
-        } else {
-            alert(result.message || "Registration failed.");
-        }
-    } catch (error) {
-        alert("Registration failed: " + error.message);
-    }
-});
-
-// Form validation feedback
-function addFormValidation(formId) {
-    const form = document.getElementById(formId);
-    form.querySelectorAll("input[required]").forEach(input => {
-        input.addEventListener("input", () => {
-            input.style.borderColor = input.value.trim() ? "" : "red";
-        });
-    });
-}
-addFormValidation("userLoginForm");
-addFormValidation("userRegisterForm");
 
 document.querySelectorAll(".category-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -445,7 +251,6 @@ document.querySelectorAll(".category-btn").forEach(btn => {
 const cartModal = document.getElementById("cartModal");
 const checkoutModal = document.getElementById("checkoutModal");
 const orderConfirmationModal = document.getElementById("orderConfirmationModal");
-const authModal = document.getElementById("authModal");
 
 document.querySelectorAll(".cart a")[0].addEventListener("click", (e) => {
     e.preventDefault();
@@ -458,12 +263,6 @@ document.getElementById("continueShopping").addEventListener("click", () => {
 });
 
 document.getElementById("proceedToCheckout").addEventListener("click", () => {
-    if (!currentUser) {
-        alert("Please log in to proceed to checkout.");
-        cartModal.style.display = "none";
-        authModal.style.display = "block";
-        return;
-    }
     cartModal.style.display = "none";
     checkoutModal.style.display = "block";
 });
@@ -479,43 +278,6 @@ document.addEventListener("click", (e) => {
         });
     }
 });
-
-window.onload = () => {
-    renderMenu("all");
-    updateUserUI();
-};
-
-async function fetchMenu() {
-    try {
-        const response = await fetch("http://localhost:4000/api/menu", {
-            credentials: "include",
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        const result = await response.json();
-        if (result.success) {
-            const menuData = {};
-            result.data.forEach(item => {
-                if (!menuData[item.category]) menuData[item.category] = [];
-                menuData[item.category].push(item);
-            });
-            return menuData;
-        } else {
-            throw new Error(result.message || "Failed to fetch menu");
-        }
-    } catch (error) {
-        console.error("Error fetching menu:", error.message);
-        alert(`Failed to load menu: ${error.message}. Using default data.`);
-        return menuData; // Fallback to hardcoded data
-    }
-}
-
-window.onload = async () => {
-    menuData = await fetchMenu();
-    renderMenu("all");
-    updateUserUI();
-};
 
 document.querySelector(".mobile-menu-toggle").addEventListener("click", () => {
     const menu = document.querySelector(".menu");
@@ -534,21 +296,12 @@ function validateForm(formId) {
                 input.style.borderColor = "";
             }
         });
-        if (formId === "userRegisterForm") {
-            const password = document.getElementById("registerPassword").value;
-            const confirmPassword = document.getElementById("registerConfirmPassword").value;
-            if (password !== confirmPassword) {
-                alert("Passwords do not match!");
-                valid = false;
-            }
-            if (password.length < 6) {
-                alert("Password must be at least 6 characters long.");
-                valid = false;
-            }
-        }
         if (!valid) e.preventDefault();
     });
 }
-validateForm("userLoginForm");
-validateForm("userRegisterForm");
 validateForm("deliveryForm");
+
+window.onload = () => {
+    loadCart();
+    renderMenu("all");
+};
