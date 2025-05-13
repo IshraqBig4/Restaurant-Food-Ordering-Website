@@ -87,7 +87,9 @@ function renderMenu(category = 'all') {
             items.push(...menuData[key]);
         }
     } else {
-        items.push(...menuData[category]);
+        for (let key in menuData) {
+            items.push(...menuData[key].filter(item => item.category === category));
+        }
     }
 
     items.forEach(item => {
